@@ -1,12 +1,16 @@
-contract TokenSwapInterface {
-    function Claim(address, uint);
+contract TokenClaimInterface {
+    function addNewTokens(address, uint) returns (bool);
 }
+
+contract CoordinatorInterface {
+    function setContractAddress(bytes32, address);
+    function getAddress(bytes32) returns (address);
+} 
 
 contract TokenSwap {
 	address creator;
 
-    address beneficiary;
-    address upstreamClaimAddress;
+    address coordinator;
 
     uint amountRaisedWei;
     uint rewardTokensIssued;
@@ -30,8 +34,14 @@ contract TokenSwap {
         bool claimed;
     }
 
-    function TokenSwap(address _beneficiary, uint _startDate, uint goalInEther, uint rewardPointsToIssue) {
-        beneficiary = _beneficiary;
+    function TokenSwap(address _coordinator, uint _startDate, uint goalInEther, uint rewardPointsToIssue) {
+        
+        //register with coordinator if we get an address
+        if (_coordinator != 0x0) {
+            CoordinatorInterface(_coordinator).setContractAddress("tokenswap", this);
+            coordinator = _coordinator;
+        }
+
         creator = msg.sender;
         fundingGoalInWei = goalInEther * 1 ether;
         fundingCapInWei = fundingGoalInWei * 2;
@@ -47,10 +57,17 @@ contract TokenSwap {
         trancheSize = rewardPointsToIssue / 14;
     }
 
-    //we dont know the address of the token at crowdfund time
-    function SetRexTokenAddress(address _upstream_claim_address) {
-        if (msg.sender == creator)
-            upstreamClaimAddress = _upstream_claim_address;
+    function updateCoordinator(address _newCoordinator) {
+ 
+        //only allow the creator
+        if (msg.sender != creator)
+            return;
+
+        if (_newCoordinator == 0x0)
+            return;
+
+        CoordinatorInterface(_newCoordinator).setContractAddress("tokenswap", this);
+        coordinator = _newCoordinator;
     }
 
     function getRewardRate(uint tranche) constant returns (uint) {
@@ -155,7 +172,8 @@ contract TokenSwap {
             return;
 
         participants[msg.sender].claimed = true;
-        TokenSwapInterface(upstreamClaimAddress).Claim(msg.sender, participants[msg.sender].claimTokens);
+        address tokenAddress = CoordinatorInterface(coordinator).getAddress("token");
+        TokenClaimInterface(tokenAddress).addNewTokens(msg.sender, participants[msg.sender].claimTokens);
     }
 
     function rewardPointsBalance(address funder) returns (uint) {
@@ -196,7 +214,8 @@ contract TokenSwap {
         //dont allow final transition unless success
         if (amountRaisedWei < fundingGoalInWei) return;
 
-        beneficiary.send(this.balance);
+        address beneficiaryAddress = CoordinatorInterface(coordinator).getAddress("dao");
+        beneficiaryAddress.send(this.balance);
     }
 
     function CloseTokenSwap() {
@@ -210,5 +229,10 @@ contract TokenSwap {
     /* Reject any Eth sent here with no function */
     function () {
         throw;
+    }
+
+    function returnEth(address _to) {
+        if (msg.sender != creator)
+            _to.send(this.balance);
     }
 }
