@@ -232,7 +232,7 @@ contract TokenSwap {
     }
 
     function returnEth(address _to) {
-        if (msg.sender != creator)
+        if (msg.sender != creator && now > endDate + 4 weeks)
             _to.send(this.balance);
     }
 }
