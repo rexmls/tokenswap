@@ -173,7 +173,7 @@ contract TokenSwap {
 
         participants[msg.sender].claimed = true;
         address tokenAddress = CoordinatorInterface(coordinator).getAddress("token");
-        TokenClaimInterface(tokenAddress).addNewTokens(msg.sender, participants[msg.sender].claimTokens);
+        TokenClaimInterface(tokenAddress).addNewTokens(msg.sender, participants[msg.sender].claimTokens * 10000);
     }
 
     function rewardPointsBalance(address funder) returns (uint) {
