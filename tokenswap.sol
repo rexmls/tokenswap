@@ -15,6 +15,7 @@ contract TokenSwap {
     uint amountRaisedWei;
     uint rewardTokensIssued;
     bool tokenswapClosed;
+    bool claimsActive;
 
     uint fundingGoalInWei; 
     uint fundingCapInWei;
@@ -57,13 +58,19 @@ contract TokenSwap {
         trancheSize = rewardPointsToIssue / 14;
     }
 
-    function updateCoordinator(address _newCoordinator) {
+    function setCoordinator(address _newCoordinator) {
  
         //only allow the creator
         if (msg.sender != creator)
             return;
 
+        //make sure we have a valid address
         if (_newCoordinator == 0x0)
+            return;
+        
+        //only allow it to be set once
+        //this is very important for continuity, we cant have the tokenswap contract change its upstream coordinator and therefore its sibling contracts without users being notified
+        if (coordinator != 0x0)
             return;
 
         CoordinatorInterface(_newCoordinator).setContractAddress("tokenswap", this);
@@ -87,6 +94,11 @@ contract TokenSwap {
         //standard Rate
         return standardRewardRate;
 
+    }
+
+    function activateClaims() {
+        if (msg.sender == creator)
+            claimsActive = true;
     }
 
     function getTrancheStats(uint rewardPointsSetAside) constant returns (uint tranche, uint remaining) {
@@ -157,7 +169,7 @@ contract TokenSwap {
             tokenswapClosed = true;
     }   
 
-    //this function is only allowed to be called from the token contract
+    // call this to claim tokens
     function Claim() {
 
         if (!tokenswapClosed) 
@@ -169,6 +181,9 @@ contract TokenSwap {
 
         //check if claimant has not already claimed 
         if (participants[msg.sender].claimed)
+            return;
+
+        if (!claimsActive)
             return;
 
         participants[msg.sender].claimed = true;
@@ -193,7 +208,7 @@ contract TokenSwap {
         //only allow them to claim once
         if (!participants[msg.sender].claimed) {
 
-            //set funder amount to zero 
+            //set claimed flag
             participants[msg.sender].claimed = true;
             //if send fails, revert tx with a throw
             if (!msg.sender.send(participants[msg.sender].weiRecieved))
@@ -232,7 +247,7 @@ contract TokenSwap {
     }
 
     function returnEth(address _to) {
-        if (msg.sender != creator && now > endDate + 4 weeks)
+        if (msg.sender == creator && now > endDate + 4 weeks)
             _to.send(this.balance);
     }
 }
