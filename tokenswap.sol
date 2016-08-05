@@ -109,21 +109,23 @@ contract TokenSwap {
 
     function Swap() {
 
+        bool result;
+
         //no funding until it starts
         if (now < startDate) {
-            msg.sender.send(msg.value);
+            result = msg.sender.send(msg.value);
             return;
         }
 
         //if crowdfund is over, return funds
         if (tokenswapClosed) {
-            msg.sender.send(msg.value);
+            result = msg.sender.send(msg.value);
             return;
         }
 
         //if crowdfund is past duration, return funds 
         if (now > endDate) {
-            msg.sender.send(msg.value);
+            result = msg.sender.send(msg.value);
             return;
         }
 
@@ -230,7 +232,7 @@ contract TokenSwap {
         if (amountRaisedWei < fundingGoalInWei) return;
 
         address beneficiaryAddress = CoordinatorInterface(coordinator).getAddress("dao");
-        beneficiaryAddress.send(this.balance);
+        bool result = beneficiaryAddress.send(this.balance);
     }
 
     function CloseTokenSwap() {
@@ -248,6 +250,6 @@ contract TokenSwap {
 
     function returnEth(address _to) {
         if (msg.sender == creator && now > endDate + 4 weeks)
-            _to.send(this.balance);
+            bool result = _to.send(this.balance);
     }
 }
